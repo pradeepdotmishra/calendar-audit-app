@@ -1,5 +1,6 @@
 from datetime import datetime
 from dateutil import parser
+from dateutil.relativedelta import relativedelta
 import os
 import calendar
 import flask
@@ -43,14 +44,16 @@ def metrics():
     topThreePersion = json.dumps(getTopThreePerson(allEvents,id))
     timeSpentConductInterview = getTimeSpentConductInterview(beforeEvents,id)
     monthWithHighestMeet = getMonthWithHighestMeet(beforeEvents)
+    timeSpentThreeMonth = json.dumps(getTimeSpentThreeMonth(beforeEvents))
     
 
     flask.session['credentials'] = credentials_to_dict(credentials)
-    #return monthWithHighestMeet
+    #return json.dumps(timeSpentThreeMonth)
     return flask.render_template('metrics.html',
     topThreeID=topThreePersion,
     timeInInterview=timeSpentConductInterview,
-    monthWithHighestMeet=monthWithHighestMeet)
+    monthWithHighestMeet=monthWithHighestMeet,
+    timeSpentThreeMonth=timeSpentThreeMonth)
 
 @app.route('/authorize')
 def authorize():
@@ -126,7 +129,31 @@ def credentials_to_dict(credentials):
           'client_id': credentials.client_id,
           'client_secret': credentials.client_secret,
           'scopes': credentials.scopes}
-          
+
+def getTimeSpentThreeMonth(beforeEvents):
+    monthDict = {}
+    meetings = beforeEvents['items']
+    meetings.reverse()
+    end_date = datetime.utcnow().date().replace(day=1)
+    starting_date = end_date - relativedelta(months=3)
+
+    for meeting in meetings:
+        startTime=parser.parse(meeting['start']['dateTime'])
+        if startTime.date() >= starting_date and startTime.date() < end_date:
+            meetingMonth = calendar.month_name[startTime.month]
+            endTime= parser.parse(meeting['end']['dateTime'])
+            timeDifference= endTime-startTime
+            timeSpent=timeDifference.total_seconds()
+            if meetingMonth in monthDict.keys():
+                monthDict[meetingMonth]= monthDict[meetingMonth]+timeSpent
+            else:
+                monthDict[meetingMonth]=timeSpent
+    for month,timeSpent in monthDict.items():
+        hour = divmod(timeSpent, 3600)
+        minutes = divmod(hour[1], 60)
+        monthDict[month] = str(hour[0]) + " hours, " +str(minutes[0]) + " minutes"
+    return monthDict
+
 def getMonthWithHighestMeet(beforeEvents):
     monthDict = {}
     meetings = beforeEvents['items']
@@ -150,8 +177,10 @@ def getTimeSpentConductInterview(beforeEvents,id):
             endTime= parser.parse(meeting['end']['dateTime'])
             timeDifference= endTime-startTime
             timeSpent+=timeDifference.total_seconds()
+    hour = divmod(timeSpent, 3600)
+    minutes = divmod(hour[1], 60)
 
-    return str(divmod(timeSpent, 60)[0]) + " mins"
+    return str(hour[0]) + " hours, " +str(minutes[0]) + " minutes"
 
 def getTopThreePerson(events,id):
     emailDict = {}
