@@ -1,6 +1,7 @@
 from datetime import datetime
 from dateutil import parser
 import os
+import calendar
 import flask
 import requests
 import json
@@ -41,11 +42,15 @@ def metrics():
     
     topThreePersion = json.dumps(getTopThreePerson(allEvents,id))
     timeSpentConductInterview = getTimeSpentConductInterview(beforeEvents,id)
+    monthWithHighestMeet = getMonthWithHighestMeet(beforeEvents)
     
 
     flask.session['credentials'] = credentials_to_dict(credentials)
-    #return timeSpentConductInterview
-    return flask.render_template('metrics.html',topThreeID=topThreePersion,timeInInterview=timeSpentConductInterview)
+    #return monthWithHighestMeet
+    return flask.render_template('metrics.html',
+    topThreeID=topThreePersion,
+    timeInInterview=timeSpentConductInterview,
+    monthWithHighestMeet=monthWithHighestMeet)
 
 @app.route('/authorize')
 def authorize():
@@ -121,6 +126,19 @@ def credentials_to_dict(credentials):
           'client_id': credentials.client_id,
           'client_secret': credentials.client_secret,
           'scopes': credentials.scopes}
+          
+def getMonthWithHighestMeet(beforeEvents):
+    monthDict = {}
+    meetings = beforeEvents['items']
+    for meeting in meetings:
+        startTime=parser.parse(meeting['start']['dateTime'])
+        meetingMonth=startTime.month
+        if meetingMonth in monthDict.keys():
+            monthDict[meetingMonth]= monthDict[meetingMonth]+1
+        else:
+            monthDict[meetingMonth]=1
+    sortedMonth = sorted(monthDict.items(), key=lambda x: x[1],reverse=True)
+    return calendar.month_name[sortedMonth[0][0]]
 
 def getTimeSpentConductInterview(beforeEvents,id):
     meetings = beforeEvents['items']
