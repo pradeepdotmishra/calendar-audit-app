@@ -1,7 +1,8 @@
 import os
 import flask
 import requests
-
+import json
+import collections
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
 import googleapiclient.discovery
@@ -19,19 +20,23 @@ app.secret_key = 'GoogleCalendarAudit-1.0'
 def index():
     return flask.render_template('index.html')
 
-@app.route('/test')
-def test_api_request():
+@app.route('/metrics')
+def metrics():
     if 'credentials' not in flask.session:
         return flask.redirect('authorize')
 
     # Load credentials from the session.
     credentials = google.oauth2.credentials.Credentials(**flask.session['credentials'])
     calendar = googleapiclient.discovery.build('calendar', 'v3', credentials=credentials)
-    events = calendar.events().list(calendarId='primary', pageToken=None).execute()
 
+    calendar_list  = calendar.calendarList().list(minAccessRole='owner').execute()
+    id=calendar_list['items'][0]['id']
+
+    events= calendar.events().list(calendarId=id,singleEvents=True,orderBy='startTime').execute()
+    topThreePersion = json.dumps(getTopThreePerson(events,id))
     flask.session['credentials'] = credentials_to_dict(credentials)
 
-    return flask.jsonify(**events)
+    return flask.render_template('metrics.html',topThreeID=topThreePersion)
 
 @app.route('/authorize')
 def authorize():
@@ -75,7 +80,7 @@ def oauth2callback():
     credentials = flow.credentials
     flask.session['credentials'] = credentials_to_dict(credentials)
 
-    return flask.redirect(flask.url_for('test_api_request'))
+    return flask.redirect(flask.url_for('metrics'))
 
 @app.route('/revoke')
 def revoke():
@@ -107,6 +112,27 @@ def credentials_to_dict(credentials):
           'client_id': credentials.client_id,
           'client_secret': credentials.client_secret,
           'scopes': credentials.scopes}
+
+def getTopThreePerson(events,id):
+    emailDict = {}
+    result=['']*3
+    meetings = events['items']
+    for meeting in meetings:
+        if "attendees" in meeting:
+            users = meeting['attendees']
+            for attendee in users:
+                userEmailId= attendee['email']
+                if userEmailId in emailDict.keys():
+                    emailDict[userEmailId]= emailDict[userEmailId]+1
+                else:
+                    emailDict[userEmailId]=1
+    emailDict.pop(id)
+    sorted_email = sorted(emailDict.items(), key=lambda x: x[1],reverse=True)
+
+    for i in range(3):
+        result[i]= sorted_email[i]
+
+    return collections.OrderedDict(result)
 
 
 if __name__ == "__main__":

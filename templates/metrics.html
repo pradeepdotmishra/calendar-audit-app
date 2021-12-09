@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<title> CALENDAR AUDIT </title>
+{% endblock %}
+
+{% block body %}
+<h1 style="text-align: center;"> CALENDAR AUDIT </h1>
+
+<table>
+    <tr><td>1. Total time spent in meetings per month for the last 3 months.</td>
+        <td></td>
+    </tr>
+    <tr><td>2. Which month had the highest number of meetings / least number of meetings</td>
+        <td></td>
+    </tr>
+
+    <tr><td>3. Busiest week / relaxed week - you can select a threshold of your choice</td>
+        <td>
+    </td></tr>
+    <tr><td>4. Average number of meetings per week, average time spent every week in meetings.</td>
+        <td>
+    </td></tr>
+    <tr><td>5. Top 3 persons with whom you have meetings</td>
+        <td> {{topThreeID}}
+    </td></tr>
+    <tr><td>6. Time spent in Recruiting/Conducting interviews</td>
+        <td>
+    </td></tr>
+</table>
+{% endblock %}
