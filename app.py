@@ -1,3 +1,5 @@
+from datetime import datetime
+from dateutil import parser
 import os
 import flask
 import requests
@@ -32,11 +34,18 @@ def metrics():
     calendar_list  = calendar.calendarList().list(minAccessRole='owner').execute()
     id=calendar_list['items'][0]['id']
 
-    events= calendar.events().list(calendarId=id,singleEvents=True,orderBy='startTime').execute()
-    topThreePersion = json.dumps(getTopThreePerson(events,id))
-    flask.session['credentials'] = credentials_to_dict(credentials)
+    allEvents= calendar.events().list(calendarId=id,singleEvents=True,orderBy='startTime').execute()
+    now=datetime.utcnow().isoformat() + 'Z'
+    afterEvents= calendar.events().list(calendarId=id,timeMin=now,singleEvents=True,orderBy='startTime').execute()
+    beforeEvents= calendar.events().list(calendarId=id,timeMax=now,singleEvents=True,orderBy='startTime').execute()
+    
+    topThreePersion = json.dumps(getTopThreePerson(allEvents,id))
+    timeSpentConductInterview = getTimeSpentConductInterview(beforeEvents,id)
+    
 
-    return flask.render_template('metrics.html',topThreeID=topThreePersion)
+    flask.session['credentials'] = credentials_to_dict(credentials)
+    #return timeSpentConductInterview
+    return flask.render_template('metrics.html',topThreeID=topThreePersion,timeInInterview=timeSpentConductInterview)
 
 @app.route('/authorize')
 def authorize():
@@ -112,6 +121,19 @@ def credentials_to_dict(credentials):
           'client_id': credentials.client_id,
           'client_secret': credentials.client_secret,
           'scopes': credentials.scopes}
+
+def getTimeSpentConductInterview(beforeEvents,id):
+    meetings = beforeEvents['items']
+    timeSpent=0
+    for meeting in meetings:
+        if meeting['organizer']['email'] == id and "interview" in meeting['summary'].lower():
+            
+            startTime=parser.parse(meeting['start']['dateTime'])
+            endTime= parser.parse(meeting['end']['dateTime'])
+            timeDifference= endTime-startTime
+            timeSpent+=timeDifference.total_seconds()
+
+    return str(divmod(timeSpent, 60)[0]) + " mins"
 
 def getTopThreePerson(events,id):
     emailDict = {}
