@@ -1,12 +1,9 @@
 from datetime import datetime
-from dateutil import parser
-from dateutil.relativedelta import relativedelta
 import os
-import calendar
 import flask
 import requests
+import operation
 import json
-import collections
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
 import googleapiclient.discovery
@@ -38,16 +35,15 @@ def metrics():
 
     allEvents= calendar.events().list(calendarId=id,singleEvents=True,orderBy='startTime').execute()
     now=datetime.utcnow().isoformat() + 'Z'
-    afterEvents= calendar.events().list(calendarId=id,timeMin=now,singleEvents=True,orderBy='startTime').execute()
     beforeEvents= calendar.events().list(calendarId=id,timeMax=now,singleEvents=True,orderBy='startTime').execute()
     
-    topThreePersion = json.dumps(getTopThreePerson(allEvents,id))
-    timeSpentConductInterview = getTimeSpentConductInterview(beforeEvents,id)
-    monthWithHighestMeet = getMonthWithHighestMeet(beforeEvents)
-    timeSpentThreeMonth = json.dumps(getTimeSpentThreeMonth(beforeEvents))
+    topThreePersion = json.dumps(operation.getTopThreePerson(allEvents,id))
+    timeSpentConductInterview = operation.getTimeSpentConductInterview(beforeEvents,id)
+    monthWithHighestMeet = operation.getMonthWithHighestMeet(beforeEvents)
+    timeSpentThreeMonth = json.dumps(operation.getTimeSpentThreeMonth(beforeEvents))
     
 
-    flask.session['credentials'] = credentials_to_dict(credentials)
+    flask.session['credentials'] = operation.credentials_to_dict(credentials)
     #return json.dumps(timeSpentThreeMonth)
     return flask.render_template('metrics.html',
     topThreeID=topThreePersion,
@@ -95,7 +91,7 @@ def oauth2callback():
   # ACTION ITEM: In a production app, you likely want to save these
   #              credentials in a persistent database instead.
     credentials = flow.credentials
-    flask.session['credentials'] = credentials_to_dict(credentials)
+    flask.session['credentials'] = operation.credentials_to_dict(credentials)
 
     return flask.redirect(flask.url_for('metrics'))
 
@@ -122,88 +118,6 @@ def clear_credentials():
         del flask.session['credentials']
     return ('Credentials have been cleared.<br><br>' + flask.render_template('index.html'))
 
-def credentials_to_dict(credentials):
-  return {'token': credentials.token,
-          'refresh_token': credentials.refresh_token,
-          'token_uri': credentials.token_uri,
-          'client_id': credentials.client_id,
-          'client_secret': credentials.client_secret,
-          'scopes': credentials.scopes}
-
-def getTimeSpentThreeMonth(beforeEvents):
-    monthDict = {}
-    meetings = beforeEvents['items']
-    meetings.reverse()
-    end_date = datetime.utcnow().date().replace(day=1)
-    starting_date = end_date - relativedelta(months=3)
-
-    for meeting in meetings:
-        if "attendees" in meeting and len(meeting['attendees']) > 1:
-            startTime=parser.parse(meeting['start']['dateTime'])
-            if startTime.date() >= starting_date and startTime.date() < end_date:
-                meetingMonth = calendar.month_name[startTime.month]
-                endTime= parser.parse(meeting['end']['dateTime'])
-                timeDifference= endTime-startTime
-                timeSpent=timeDifference.total_seconds()
-                if meetingMonth in monthDict.keys():
-                    monthDict[meetingMonth]= monthDict[meetingMonth]+timeSpent
-                else:
-                    monthDict[meetingMonth]=timeSpent
-
-    for month,timeSpent in monthDict.items():
-        hour = divmod(timeSpent, 3600)
-        minutes = divmod(hour[1], 60)
-        monthDict[month] = str(hour[0]) + " hours, " +str(minutes[0]) + " minutes"
-    return monthDict
-
-def getMonthWithHighestMeet(beforeEvents):
-    monthDict = {}
-    meetings = beforeEvents['items']
-    for meeting in meetings:
-        startTime=parser.parse(meeting['start']['dateTime'])
-        meetingMonth=startTime.month
-        if meetingMonth in monthDict.keys():
-            monthDict[meetingMonth]= monthDict[meetingMonth]+1
-        else:
-            monthDict[meetingMonth]=1
-    sortedMonth = sorted(monthDict.items(), key=lambda x: x[1],reverse=True)
-    return calendar.month_name[sortedMonth[0][0]]
-
-def getTimeSpentConductInterview(beforeEvents,id):
-    meetings = beforeEvents['items']
-    timeSpent=0
-    for meeting in meetings:
-        if meeting['organizer']['email'] == id and "interview" in meeting['summary'].lower():
-            
-            startTime=parser.parse(meeting['start']['dateTime'])
-            endTime= parser.parse(meeting['end']['dateTime'])
-            timeDifference= endTime-startTime
-            timeSpent+=timeDifference.total_seconds()
-    hour = divmod(timeSpent, 3600)
-    minutes = divmod(hour[1], 60)
-
-    return str(hour[0]) + " hours, " +str(minutes[0]) + " minutes"
-
-def getTopThreePerson(events,id):
-    emailDict = {}
-    result=['']*3
-    meetings = events['items']
-    for meeting in meetings:
-        if "attendees" in meeting:
-            users = meeting['attendees']
-            for attendee in users:
-                userEmailId= attendee['email']
-                if userEmailId in emailDict.keys():
-                    emailDict[userEmailId]= emailDict[userEmailId]+1
-                else:
-                    emailDict[userEmailId]=1
-    emailDict.pop(id)
-    sorted_email = sorted(emailDict.items(), key=lambda x: x[1],reverse=True)
-
-    for i in range(3):
-        result[i]= sorted_email[i]
-
-    return collections.OrderedDict(result)
 
 
 if __name__ == "__main__":
