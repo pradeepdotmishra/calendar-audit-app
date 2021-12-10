@@ -24,3 +24,5 @@ meetings.</br>
 
 <h4>Deployed at heroku and below is the link : </h4></br>
 https://calendarauditapp.herokuapp.com/
+</br>
+Please setup client_secret.son file to access google calender api.
