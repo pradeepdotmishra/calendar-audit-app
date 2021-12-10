@@ -138,7 +138,7 @@ def getTimeSpentThreeMonth(beforeEvents):
     starting_date = end_date - relativedelta(months=3)
 
     for meeting in meetings:
-        if "attendees" in meeting:
+        if "attendees" in meeting and meeting['attendees'].len() > 1:
             startTime=parser.parse(meeting['start']['dateTime'])
             if startTime.date() >= starting_date and startTime.date() < end_date:
                 meetingMonth = calendar.month_name[startTime.month]
@@ -149,7 +149,7 @@ def getTimeSpentThreeMonth(beforeEvents):
                     monthDict[meetingMonth]= monthDict[meetingMonth]+timeSpent
                 else:
                     monthDict[meetingMonth]=timeSpent
-                    
+
     for month,timeSpent in monthDict.items():
         hour = divmod(timeSpent, 3600)
         minutes = divmod(hour[1], 60)
